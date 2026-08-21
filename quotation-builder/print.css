@@ -1,0 +1,90 @@
+/* ==========================================================================
+   Print stylesheet — governs PDF export via browser-native print (Ctrl/Cmd+P)
+   The live A4 preview prints directly, so print output matches preview 1:1.
+
+   Strategy: the document is a single flowing box. On screen its own padding
+   fakes the paper margins. In print we hand margins to @page instead and
+   strip the box's own padding — the browser then repeats that margin on
+   every physical page it breaks the flow into, so multi-page output needs
+   no manual pagination logic.
+   ========================================================================== */
+
+@page {
+  size: A4 portrait;
+  margin: 18mm 16mm 16mm;
+}
+
+@media print {
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    width: auto;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Hide all editor / app chrome — only the document prints */
+  .editor,
+  .preview-toolbar,
+  .modal-backdrop,
+  .toast {
+    display: none !important;
+  }
+
+  .app {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .preview-pane {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .preview-scroll {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  .a4-stage {
+    transform: none !important;
+    height: auto !important;
+  }
+
+  .a4-page {
+    box-shadow: none !important;
+    margin: 0 !important;
+    width: auto;
+    min-height: 0;
+    height: auto;
+    padding: 0 !important;
+  }
+
+  .page-break-marker { display: none !important; }
+
+  .doc-section,
+  .services-table tbody tr,
+  .doc-scope-list li,
+  .doc-totals,
+  .payment-box,
+  .doc-header,
+  .doc-meta-row {
+    break-inside: avoid;
+  }
+
+  .services-table thead {
+    display: table-header-group;
+  }
+}

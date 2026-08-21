@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Quotation &amp; Invoice Builder</title>
+<link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="print.css" media="print" />
+</head>
+<body>
+
+<div class="app" id="app">
+
+  <!-- ============ LEFT PANEL — CONTROLS ============ -->
+  <aside class="editor" id="editor">
+
+    <header class="editor-brand">
+      <div class="editor-brand-name">Document Builder</div>
+      <div class="editor-brand-sub" id="saveStatus">All changes saved</div>
+    </header>
+
+    <!-- Document actions -->
+    <section class="ctrl-group ctrl-actions">
+      <button class="btn btn-ghost" id="btnNew" title="Start a new blank document">New</button>
+      <button class="btn btn-ghost" id="btnSave" title="Save this document to your local list">Save</button>
+      <button class="btn btn-ghost" id="btnDuplicate" title="Duplicate this document">Duplicate</button>
+      <button class="btn btn-ghost" id="btnReset" title="Reset to defaults">Reset</button>
+      <button class="btn btn-ghost" id="btnLoad" title="Browse saved documents">Saved&nbsp;(<span id="savedCount">0</span>)</button>
+    </section>
+
+    <!-- Document type -->
+    <section class="ctrl-group">
+      <div class="ctrl-label">Document Type</div>
+      <div class="segmented" id="docTypeToggle">
+        <button type="button" class="segmented-opt is-active" data-value="quotation">Quotation</button>
+        <button type="button" class="segmented-opt" data-value="invoice">Invoice</button>
+      </div>
+    </section>
+
+    <!-- Document meta -->
+    <section class="ctrl-group">
+      <div class="ctrl-label">Document Info</div>
+      <div class="field-grid">
+        <label class="field">
+          <span id="lblDocNumber">Quotation Number</span>
+          <input type="text" id="fDocNumber" placeholder="Q-20260821-01" />
+        </label>
+        <label class="field">
+          <span id="lblDocDate">Date</span>
+          <input type="date" id="fDocDate" />
+        </label>
+        <label class="field" id="wrapValidUntil">
+          <span>Valid Until</span>
+          <input type="date" id="fValidUntil" />
+        </label>
+        <label class="field" id="wrapDueDate" hidden>
+          <span>Due Date</span>
+          <input type="date" id="fDueDate" />
+        </label>
+      </div>
+      <label class="field toggle-field" id="wrapPoRef" hidden>
+        <span class="toggle-row">
+          <span>Reference / PO Number</span>
+          <input type="checkbox" id="tPoRef" />
+        </span>
+        <input type="text" id="fPoRef" placeholder="PO-1029" />
+      </label>
+    </section>
+
+    <!-- Client -->
+    <section class="ctrl-group">
+      <div class="ctrl-label">Client</div>
+      <div class="field-grid">
+        <label class="field field-full">
+          <span>Client Name</span>
+          <input type="text" id="fClientName" placeholder="PT Contoh Digital Indonesia" />
+        </label>
+      </div>
+      <label class="field toggle-field" id="wrapClientAddress">
+        <span class="toggle-row">
+          <span>Client Address</span>
+          <input type="checkbox" id="tClientAddress" checked />
+        </span>
+        <textarea id="fClientAddress" rows="2" placeholder="Jl. Sudirman No. 1, Jakarta Selatan"></textarea>
+      </label>
+    </section>
+
+    <!-- Project -->
+    <section class="ctrl-group">
+      <div class="ctrl-label">Project</div>
+      <div class="field-grid">
+        <label class="field field-full">
+          <span>Project Name</span>
+          <input type="text" id="fProjectName" placeholder="Digital USP Campaign" />
+        </label>
+      </div>
+      <label class="field toggle-field" id="wrapProjectDesc">
+        <span class="toggle-row">
+          <span>Project Description</span>
+          <input type="checkbox" id="tProjectDesc" checked />
+        </span>
+        <textarea id="fProjectDesc" rows="2" placeholder="Short summary of the project brief and objective."></textarea>
+      </label>
+    </section>
+
+    <!-- Scope & Deliverables -->
+    <section class="ctrl-group">
+      <div class="ctrl-label toggle-row">
+        <span>Scope &amp; Deliverables</span>
+        <input type="checkbox" id="tScope" checked />
+      </div>
+      <div class="list-editor" id="scopeList"></div>
+      <button class="btn btn-add" id="btnAddScope" type="button">+ Add item</button>
+    </section>
+
+    <!-- Services & Fees -->
+    <section class="ctrl-group">
+      <div class="ctrl-label">Services &amp; Fees</div>
+      <label class="field">
+        <span>Apply a preset (optional)</span>
+        <select id="fPreset">
+          <option value="">— Choose a preset —</option>
+          <option value="motion">Motion Design</option>
+          <option value="cgi">3D / CGI</option>
+          <option value="ai">AI-Assisted Hybrid</option>
+          <option value="liveaction">Live Action / Shooting</option>
+          <option value="full">Full Production</option>
+        </select>
+      </label>
+      <div class="services-editor" id="servicesList"></div>
+      <button class="btn btn-add" id="btnAddService" type="button">+ Add service</button>
+    </section>
+
+    <!-- Calculations -->
+    <section class="ctrl-group">
+      <div class="ctrl-label">Adjustments</div>
+      <label class="field toggle-field">
+        <span class="toggle-row">
+          <span>Discount</span>
+          <input type="checkbox" id="tDiscount" />
+        </span>
+        <span class="inline-fields">
+          <select id="fDiscountType">
+            <option value="percent">%</option>
+            <option value="fixed">Fixed</option>
+          </select>
+          <input type="number" id="fDiscountValue" min="0" step="any" placeholder="0" />
+        </span>
+      </label>
+      <label class="field toggle-field">
+        <span class="toggle-row">
+          <span>Additional Cost</span>
+          <input type="checkbox" id="tAdditionalCost" />
+        </span>
+        <span class="inline-fields">
+          <input type="text" id="fAdditionalCostLabel" placeholder="Label (e.g. Transport)" />
+          <input type="number" id="fAdditionalCostValue" min="0" step="any" placeholder="0" />
+        </span>
+      </label>
+    </section>
+
+    <!-- Terms modules -->
+    <section class="ctrl-group">
+      <div class="ctrl-label toggle-row">
+        <span>Revision Terms</span>
+        <input type="checkbox" id="tRevision" checked />
+      </div>
+      <textarea id="fRevision" rows="2"></textarea>
+    </section>
+
+    <section class="ctrl-group">
+      <div class="ctrl-label toggle-row">
+        <span>Exclusions</span>
+        <input type="checkbox" id="tExclusions" checked />
+      </div>
+      <textarea id="fExclusions" rows="2"></textarea>
+    </section>
+
+    <section class="ctrl-group">
+      <div class="ctrl-label toggle-row">
+        <span>Payment Terms</span>
+        <input type="checkbox" id="tPaymentTerms" checked />
+      </div>
+      <textarea id="fPaymentTerms" rows="2"></textarea>
+    </section>
+
+    <section class="ctrl-group" id="wrapPaymentDetails" hidden>
+      <div class="ctrl-label toggle-row">
+        <span>Payment Details</span>
+        <input type="checkbox" id="tPaymentDetails" />
+      </div>
+      <div class="field-grid">
+        <label class="field field-full">
+          <span>Bank Name</span>
+          <input type="text" id="fBankName" placeholder="Bank Central Asia (BCA)" />
+        </label>
+        <label class="field field-full">
+          <span>Account Name</span>
+          <input type="text" id="fAccountName" placeholder="Abdul Fariz" />
+        </label>
+        <label class="field field-full">
+          <span>Account Number</span>
+          <input type="text" id="fAccountNumber" placeholder="1234567890" />
+        </label>
+      </div>
+    </section>
+
+    <section class="ctrl-group">
+      <div class="ctrl-label toggle-row">
+        <span>Notes</span>
+        <input type="checkbox" id="tNotes" checked />
+      </div>
+      <textarea id="fNotes" rows="2"></textarea>
+    </section>
+
+    <!-- Currency -->
+    <section class="ctrl-group">
+      <div class="ctrl-label">Currency</div>
+      <div class="field-grid">
+        <label class="field">
+          <span>Currency</span>
+          <select id="fCurrency">
+            <option value="IDR">IDR — Rp</option>
+            <option value="USD">USD — $</option>
+            <option value="SGD">SGD — S$</option>
+            <option value="custom">Custom</option>
+          </select>
+        </label>
+        <label class="field" id="wrapCustomCurrency" hidden>
+          <span>Symbol</span>
+          <input type="text" id="fCustomCurrency" placeholder="€" maxlength="4" />
+        </label>
+      </div>
+    </section>
+
+    <!-- Creator identity (settings) -->
+    <details class="ctrl-group ctrl-collapsible">
+      <summary class="ctrl-label">Creator Identity (Settings)</summary>
+      <div class="field-grid">
+        <label class="field field-full">
+          <span>Name</span>
+          <input type="text" id="fCreatorName" />
+        </label>
+        <label class="field field-full">
+          <span>Title</span>
+          <input type="text" id="fCreatorTitle" />
+        </label>
+        <label class="field field-full">
+          <span>Specialization Line</span>
+          <input type="text" id="fCreatorSpecialization" />
+        </label>
+        <label class="field field-full">
+          <span>Email</span>
+          <input type="text" id="fCreatorEmail" />
+        </label>
+        <label class="field field-full">
+          <span>Phone / WhatsApp</span>
+          <input type="text" id="fCreatorPhone" />
+        </label>
+        <label class="field field-full">
+          <span>Website / Instagram</span>
+          <input type="text" id="fCreatorWebsite" />
+        </label>
+      </div>
+    </details>
+
+    <div class="editor-spacer"></div>
+  </aside>
+
+  <!-- ============ RIGHT PANEL — PREVIEW ============ -->
+  <main class="preview-pane">
+    <div class="preview-toolbar">
+      <div class="preview-zoom">
+        <button class="btn btn-icon" id="zoomOut" title="Zoom out">–</button>
+        <span id="zoomLevel">100%</span>
+        <button class="btn btn-icon" id="zoomIn" title="Zoom in">+</button>
+      </div>
+      <div class="preview-actions">
+        <button class="btn btn-primary" id="btnExportPdf">Export PDF</button>
+        <button class="btn btn-secondary" id="btnExportPng">Export PNG</button>
+      </div>
+    </div>
+
+    <div class="preview-scroll" id="previewScroll">
+      <div class="a4-stage" id="a4Stage">
+        <!-- .a4-page nodes injected here by app.js -->
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<!-- Saved documents modal -->
+<div class="modal-backdrop" id="modalBackdrop" hidden>
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Saved Documents</h2>
+      <button class="btn btn-icon" id="modalClose">&times;</button>
+    </div>
+    <div class="modal-body" id="savedList"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="vendor/html2canvas.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

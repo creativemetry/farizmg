@@ -55,8 +55,10 @@ is opened via a plain local static server (everything else still works
    `GEMINI_API_KEY` = your key, for both **Production** and **Preview**.
 3. Redeploy (or just push — it happens automatically).
 
-The key is only ever used server-side by `api/rewrite.js`; it's never sent
-to the browser.
+The key is only ever used server-side by `/api/rewrite.js` **at the repo
+root** (not inside this folder) — Vercel's zero-config Functions only auto-detect
+an `api/` directory at the project root, so that's where it has to live for
+`/api/rewrite` to resolve correctly. It's never sent to the browser.
 
 ## Files
 
@@ -65,5 +67,6 @@ to the browser.
 - `print.css` — print-only rules (`@page`, chrome hiding, pagination)
 - `app.js` — state model, rendering, persistence, and export logic
 - `vendor/html2canvas.min.js` — MIT-licensed, used only for PNG export
-- `api/rewrite.js` — Vercel serverless function powering the optional AI
-  text recommendation feature (see above)
+
+See also `/api/rewrite.js` at the repository root — the Vercel serverless
+function powering the optional AI text recommendation feature (see above).

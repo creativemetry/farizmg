@@ -35,6 +35,29 @@ python3 -m http.server 8000
 Everything lives in your browser's local storage on this machine only —
 nothing is sent anywhere.
 
+## AI text recommendation (optional, Vercel-only)
+
+Every free-text field (Project Description, Scope & Deliverables, Service
+item name/detail, Revision Terms, Exclusions, Payment Terms, Notes) has a
+"✨ Rekomendasi" button that suggests a polished, professional English
+rewrite — translating from Indonesian if that's what you typed. It always
+shows the suggestion first; nothing replaces your text until you click
+"Pakai teks ini".
+
+This is the one feature that needs a live backend, so it only works on a
+Vercel deployment — it fails gracefully with a clear message when the app
+is opened via a plain local static server (everything else still works
+100% offline). To enable it on your deployment:
+
+1. Get a free API key at [Google AI Studio](https://aistudio.google.com/apikey)
+   (no credit card required for the free tier).
+2. In the Vercel project's **Settings → Environment Variables**, add
+   `GEMINI_API_KEY` = your key, for both **Production** and **Preview**.
+3. Redeploy (or just push — it happens automatically).
+
+The key is only ever used server-side by `api/rewrite.js`; it's never sent
+to the browser.
+
 ## Files
 
 - `index.html` — app shell (editor controls + preview markup)
@@ -42,3 +65,5 @@ nothing is sent anywhere.
 - `print.css` — print-only rules (`@page`, chrome hiding, pagination)
 - `app.js` — state model, rendering, persistence, and export logic
 - `vendor/html2canvas.min.js` — MIT-licensed, used only for PNG export
+- `api/rewrite.js` — Vercel serverless function powering the optional AI
+  text recommendation feature (see above)

@@ -71,8 +71,8 @@
     name: "Abdul Fariz",
     title: "Motion Designer & 3D Artist",
     specialization: "Product CGI · SaaS Motion · Hybrid Commercials",
-    email: "creativemetry@gmail.com",
-    phone: "",
+    email: "alfarizgraphic@gmail.com",
+    phone: "+62 857-7607-9212",
     website: "",
   };
 

@@ -889,9 +889,27 @@
 
   /* ---------------------------------------------------------- export */
 
+  // iOS WebKit quirks: every iOS browser (Safari, Chrome, Firefox, etc.) is a
+  // WebKit wrapper, and window.print() is unreliable outside Safari itself —
+  // Chrome/Firefox-on-iOS often silently do nothing when it's called.
+  function isIOS() {
+    return /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  }
+  function isIOSNonSafari() {
+    return isIOS() && /CriOS|FxiOS|EdgiOS|OPiOS/.test(navigator.userAgent);
+  }
+
   function exportPdf() {
-    showToast("Opening print dialog — choose “Save as PDF”");
+    if (isIOSNonSafari()) {
+      showToast("Di iPhone, PDF export paling stabil lewat Safari — buka link ini di Safari lalu coba lagi");
+    } else {
+      showToast("Opening print dialog — choose “Save as PDF”");
+    }
     setTimeout(() => window.print(), 150);
+  }
+
+  function canvasToBlob(canvas) {
+    return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
   }
 
   async function exportPng() {
@@ -917,8 +935,10 @@
       const totalPages = Math.max(1, Math.ceil(canvas.height / pageHeightCanvas));
       const baseName = (state.meta.number || (state.type === "invoice" ? "invoice" : "quotation")).replace(/[^a-z0-9-_]+/gi, "-");
 
+      const files = [];
       if (totalPages <= 1) {
-        downloadCanvas(canvas, `${baseName}.png`);
+        const blob = await canvasToBlob(canvas);
+        files.push(new File([blob], `${baseName}.png`, { type: "image/png" }));
       } else {
         for (let i = 0; i < totalPages; i++) {
           const sliceHeight = Math.min(pageHeightCanvas, canvas.height - i * pageHeightCanvas);
@@ -927,12 +947,12 @@
           sliceCanvas.height = sliceHeight;
           const ctx = sliceCanvas.getContext("2d");
           ctx.drawImage(canvas, 0, i * pageHeightCanvas, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
-          downloadCanvas(sliceCanvas, `${baseName}-page-${i + 1}.png`);
-          // small delay so the browser doesn't block rapid sequential downloads
-          await new Promise((r) => setTimeout(r, 200));
+          const blob = await canvasToBlob(sliceCanvas);
+          files.push(new File([blob], `${baseName}-page-${i + 1}.png`, { type: "image/png" }));
         }
-        showToast(`Exported ${totalPages} PNG pages`);
       }
+
+      await deliverFiles(files);
     } catch (err) {
       console.error(err);
       showToast("PNG export failed — see console for details");
@@ -943,13 +963,32 @@
     }
   }
 
-  function downloadCanvas(canvas, filename) {
-    const a = document.createElement("a");
-    a.href = canvas.toDataURL("image/png");
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  // Mobile Safari/Chrome-iOS don't reliably support programmatic downloads
+  // via <a download> (especially after an async gap like html2canvas), so
+  // prefer the native share sheet — which also gives an unmistakable success
+  // signal instead of a download that silently lands somewhere unseen.
+  async function deliverFiles(files) {
+    if (navigator.canShare && navigator.canShare({ files })) {
+      try {
+        await navigator.share({ files, title: state.meta.number || "Document" });
+        showToast(files.length > 1 ? `Dibagikan ${files.length} halaman` : "Siap disimpan");
+        return;
+      } catch (err) {
+        if (err && err.name === "AbortError") return; // user cancelled the share sheet
+        // otherwise fall through to the direct-download fallback below
+      }
+    }
+    files.forEach((file) => {
+      const url = URL.createObjectURL(file);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    });
+    showToast(files.length > 1 ? `Exported ${files.length} PNG pages` : "PNG downloaded");
   }
 
   /* ---------------------------------------------------------- toast */

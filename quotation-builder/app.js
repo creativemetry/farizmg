@@ -788,16 +788,20 @@
     // A single unnamed phase is the common "simple project" case — render it
     // as a flat list with no group header/subtotal, matching the old layout.
     // Multiple phases, or any phase someone bothered to name, get grouped.
-    const showGrouping = phasesWithItems.length > 1 || phasesWithItems.some((p) => p.name.trim());
+    const showHeaders = phasesWithItems.length > 1 || phasesWithItems.some((p) => p.name.trim());
+    // Per-phase subtotals only earn their keep when there's more than one
+    // phase to compare — with a single phase the subtotal always equals the
+    // grand total shown right below, so it's a redundant row, not information.
+    const showSubtotals = phasesWithItems.length > 1;
 
     const rows = phasesWithItems.map((phase, i) => {
       const label = phase.name.trim() || "Services";
       let html = "";
-      if (showGrouping) {
+      if (showHeaders) {
         html += `<tr class="phase-row${i === 0 ? " phase-row--first" : ""}"><td colspan="${colCount}">${escapeHtml(label)}</td></tr>`;
       }
       html += phase.items.map((row) => serviceDocRowHtml(row, anyBreakdown, st)).join("");
-      if (showGrouping) {
+      if (showSubtotals) {
         const leadColspan = colCount - 2;
         const leadTd = leadColspan > 0 ? `<td colspan="${leadColspan}"></td>` : "";
         html += `<tr class="phase-subtotal-row">${leadTd}<td class="phase-subtotal-label">Subtotal ${escapeHtml(label)}</td><td class="col-amount">${formatMoney(computePhaseSubtotal(phase), st)}</td></tr>`;

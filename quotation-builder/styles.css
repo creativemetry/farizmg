@@ -587,7 +587,7 @@ textarea { resize: vertical; min-height: 44px; line-height: 1.4; }
 /* phase grouping rows (only present when the document has more than one
    phase, or a single phase the user bothered to name) */
 .services-table tr.phase-row td {
-  padding: 14px 8px 6px 0;
+  padding: 9px 8px 3px 0;
   border-bottom: 1px solid var(--ink);
   font-size: 10px;
   font-weight: 700;
@@ -598,7 +598,7 @@ textarea { resize: vertical; min-height: 44px; line-height: 1.4; }
 }
 .services-table tr.phase-row--first td { padding-top: 0; }
 .services-table tr.phase-subtotal-row td {
-  padding: 4px 8px 12px 0;
+  padding: 2px 8px 7px 0;
   border-bottom: none;
   font-size: 10.5px;
   break-inside: avoid;

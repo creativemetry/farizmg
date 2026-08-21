@@ -430,6 +430,14 @@
     qs("#zoomIn").addEventListener("click", () => setZoom(zoom + 0.1));
     qs("#zoomOut").addEventListener("click", () => setZoom(zoom - 0.1));
 
+    qsa("#mobileTabs .mobile-tab-opt").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        qsa("#mobileTabs .mobile-tab-opt").forEach((b) => b.classList.toggle("is-active", b === btn));
+        qs("#app").classList.toggle("mobile-tab-preview", btn.dataset.tab === "preview");
+        if (btn.dataset.tab === "preview") requestAnimationFrame(() => { fitZoomToViewport(); renderPageBreakMarkers(); });
+      });
+    });
+
     window.addEventListener("beforeunload", (e) => {
       if (dirty) { e.preventDefault(); e.returnValue = ""; }
     });
@@ -749,10 +757,25 @@
 
   let zoom = 0.82;
   function setZoom(val) {
-    zoom = Math.min(1.4, Math.max(0.4, Math.round(val * 100) / 100));
+    zoom = Math.min(1.4, Math.max(0.25, Math.round(val * 100) / 100));
     qs("#a4Stage").style.setProperty("--zoom", zoom);
     qs("#zoomLevel").textContent = Math.round(zoom * 100) + "%";
     requestAnimationFrame(renderPageBreakMarkers);
+  }
+
+  // On narrow screens, shrink the zoom so the A4 page fits the viewport
+  // width instead of overflowing sideways. Only shrinks — a user's manual
+  // zoom-in via the +/- buttons is left alone until the next resize.
+  const MM_TO_PX = 96 / 25.4;
+  function fitZoomToViewport() {
+    const scrollEl = qs("#previewScroll");
+    // skip while hidden (e.g. the mobile "Edit" tab is active) — clientWidth
+    // would read 0 there and incorrectly collapse the zoom to its floor
+    if (!scrollEl || scrollEl.clientWidth === 0) return;
+    const available = scrollEl.clientWidth - 32;
+    const naturalWidthPx = 210 * MM_TO_PX;
+    const fitZoom = available / naturalWidthPx;
+    if (fitZoom < zoom) setZoom(fitZoom);
   }
 
   /* ---------------------------------------------------------- document actions */
@@ -952,9 +975,10 @@
     bindControlEvents();
     syncControlsFromState();
     setZoom(zoom);
+    fitZoomToViewport();
     updateSaveStatus();
 
-    window.addEventListener("resize", () => requestAnimationFrame(renderPageBreakMarkers));
+    window.addEventListener("resize", () => requestAnimationFrame(() => { fitZoomToViewport(); renderPageBreakMarkers(); }));
   }
 
   document.addEventListener("DOMContentLoaded", init);

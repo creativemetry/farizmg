@@ -284,9 +284,45 @@ textarea { resize: vertical; min-height: 44px; line-height: 1.4; }
 .mini-btn:hover { color: var(--ink); background: var(--control-bg); }
 .mini-btn.mini-danger:hover { color: var(--danger); }
 
-/* services editor */
+/* phases & services editor */
 
-.services-editor { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.phases-editor { display: flex; flex-direction: column; gap: 14px; margin-top: 10px; }
+
+.phase-block {
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  background: #fbfaf7;
+}
+.phase-block-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.phase-block-head input[type="text"] {
+  background: #fff;
+  font-weight: 600;
+}
+.phase-block-actions { display: flex; gap: 2px; flex: 0 0 auto; }
+.phase-items { display: flex; flex-direction: column; gap: 10px; }
+.phase-block-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
+.phase-block-foot .btn-add { margin-top: 0; flex: 1; }
+.phase-subtotal {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.saved-empty--tight { padding: 12px 6px; font-size: 12px; }
+
 .service-row {
   border: 1px solid var(--control-border);
   border-radius: var(--radius-md);
@@ -547,6 +583,35 @@ textarea { resize: vertical; min-height: 44px; line-height: 1.4; }
 .svc-name { font-weight: 600; color: var(--ink); }
 .svc-detail { color: var(--ink-faint); font-size: 10.5px; margin-top: 2px; }
 .services-table td.col-amount { font-weight: 600; font-family: var(--font-mono); }
+
+/* phase grouping rows (only present when the document has more than one
+   phase, or a single phase the user bothered to name) */
+.services-table tr.phase-row td {
+  padding: 9px 8px 3px 0;
+  border-bottom: 1px solid var(--ink);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--ink);
+  break-inside: avoid;
+}
+.services-table tr.phase-row--first td { padding-top: 0; }
+.services-table tr.phase-subtotal-row td {
+  padding: 2px 8px 7px 0;
+  border-bottom: none;
+  font-size: 10.5px;
+  break-inside: avoid;
+}
+.services-table tr.phase-subtotal-row td.phase-subtotal-label {
+  text-align: right;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.services-table tr.phase-subtotal-row td.col-amount {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
 
 /* -- totals -- */
 

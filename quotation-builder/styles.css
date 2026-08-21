@@ -353,6 +353,53 @@ textarea { resize: vertical; min-height: 44px; line-height: 1.4; }
 .service-amount { font-family: var(--font-mono); font-size: 12.5px; font-weight: 600; }
 .service-row-actions { display: flex; gap: 2px; }
 
+/* AI text recommendation */
+
+.ai-recommend-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  border: 1px dashed var(--control-border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  padding: 4px 9px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.ai-recommend-btn:hover { border-color: var(--ink); color: var(--ink); }
+.ai-recommend-btn:disabled { opacity: 0.6; cursor: default; }
+
+.ai-suggestion {
+  margin-top: 6px;
+  padding: 9px 10px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-sm);
+  background: #fbfaf7;
+}
+.ai-suggestion-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+.ai-suggestion-text {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-main);
+  white-space: pre-line;
+}
+.ai-suggestion-sub { color: var(--text-muted); font-size: 11px; }
+.ai-suggestion-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.ai-suggestion-actions .btn { font-size: 11.5px; padding: 5px 10px; }
+
 .editor-spacer { height: 20px; }
 
 /* ---------------------------------------------------------------- modal */

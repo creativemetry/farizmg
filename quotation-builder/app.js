@@ -469,6 +469,171 @@
     });
   }
 
+  /* ---------------------------------------------------------- AI text recommendation */
+
+  // Calls the /api/rewrite serverless function (only live on a Vercel
+  // deployment — never available when opening the app via a plain local
+  // static server, which is expected and handled gracefully below).
+  async function fetchTextRecommendation(text, fieldType) {
+    let res;
+    try {
+      res = await fetch("/api/rewrite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, fieldType }),
+      });
+    } catch (e) {
+      throw new Error("Tidak bisa terhubung ke layanan AI. Fitur ini hanya aktif saat dibuka lewat deployment Vercel.");
+    }
+    let data = {};
+    try { data = await res.json(); } catch (e) { /* non-JSON response — e.g. a plain static server with no /api route */ }
+    if (!res.ok) {
+      // A real /api/rewrite failure always replies with structured JSON { error }.
+      // No `error` field means this isn't even our endpoint (wrong server / 404 / 501).
+      if (!data.error) {
+        throw new Error("Fitur AI ini hanya aktif di deployment Vercel — tidak tersedia saat dibuka lewat server lokal biasa.");
+      }
+      throw new Error(data.error);
+    }
+    if (!data.suggestion) throw new Error("Rekomendasi kosong — coba lagi.");
+    return data.suggestion;
+  }
+
+  function buildSuggestionPanel() {
+    const panel = document.createElement("div");
+    panel.className = "ai-suggestion";
+    panel.hidden = true;
+    panel.innerHTML = `
+      <div class="ai-suggestion-label">✨ Saran (English)</div>
+      <div class="ai-suggestion-text"></div>
+      <div class="ai-suggestion-actions">
+        <button type="button" class="btn btn-ghost" data-ai-action="accept">Pakai teks ini</button>
+        <button type="button" class="btn btn-ghost" data-ai-action="dismiss">Tutup</button>
+      </div>
+    `;
+    return panel;
+  }
+
+  // Generic single-field attach: works for any plain text input/textarea.
+  // `existingBtn` lets a template pre-place the trigger button (e.g. inside
+  // an existing icon-button cluster); otherwise one is created and inserted
+  // right after `targetEl`. `anchorEl` controls where the suggestion panel
+  // is inserted (defaults to right after targetEl).
+  function attachRecommendButton(targetEl, fieldType, existingBtn, anchorEl) {
+    if (!targetEl) return;
+    const btn = existingBtn || document.createElement("button");
+    if (!existingBtn) {
+      btn.type = "button";
+      btn.className = "ai-recommend-btn";
+      btn.textContent = "✨ Rekomendasi";
+      targetEl.insertAdjacentElement("afterend", btn);
+    }
+
+    const panel = buildSuggestionPanel();
+    (anchorEl || btn).insertAdjacentElement("afterend", panel);
+
+    btn.addEventListener("click", async () => {
+      const text = targetEl.value.trim();
+      if (!text) { showToast("Isi teksnya dulu sebelum minta rekomendasi"); return; }
+      const prevLabel = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "…";
+      panel.hidden = true;
+      try {
+        const suggestion = await fetchTextRecommendation(text, fieldType);
+        qs(".ai-suggestion-text", panel).textContent = suggestion;
+        panel.dataset.suggestion = suggestion;
+        panel.hidden = false;
+      } catch (err) {
+        showToast(err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = prevLabel;
+      }
+    });
+
+    qs("[data-ai-action='accept']", panel).addEventListener("click", () => {
+      targetEl.value = panel.dataset.suggestion || "";
+      targetEl.dispatchEvent(new Event("input", { bubbles: true }));
+      panel.hidden = true;
+    });
+    qs("[data-ai-action='dismiss']", panel).addEventListener("click", () => { panel.hidden = true; });
+    targetEl.addEventListener("input", () => { panel.hidden = true; });
+  }
+
+  function parseServiceItemSuggestion(text) {
+    const nameMatch = text.match(/Name:\s*(.*)/i);
+    const detailMatch = text.match(/Detail:\s*(.*)/i);
+    return {
+      name: nameMatch ? nameMatch[1].trim() : text.trim(),
+      detail: detailMatch ? detailMatch[1].trim() : "",
+    };
+  }
+
+  // Specialized attach for a service row: one button improves both the
+  // item's name and detail together in a single request (they're really
+  // one piece of copy), then splits the reply back into the two fields.
+  function attachServiceItemRecommendButton(rowEl) {
+    const nameEl = qs("[data-field='name']", rowEl);
+    const detailEl = qs("[data-field='detail']", rowEl);
+    const actionsEl = qs(".service-row-actions", rowEl);
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "mini-btn";
+    btn.title = "Rekomendasi teks (AI)";
+    btn.textContent = "✨";
+    actionsEl.insertBefore(btn, actionsEl.firstChild);
+
+    const panel = buildSuggestionPanel();
+    rowEl.appendChild(panel);
+
+    btn.addEventListener("click", async () => {
+      const name = nameEl.value.trim();
+      const detail = detailEl.value.trim();
+      if (!name && !detail) { showToast("Isi nama atau detail item dulu"); return; }
+      const prevLabel = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "…";
+      panel.hidden = true;
+      try {
+        const suggestion = await fetchTextRecommendation(`Name: ${name}\nDetail: ${detail}`, "serviceItem");
+        const parsed = parseServiceItemSuggestion(suggestion);
+        qs(".ai-suggestion-text", panel).innerHTML = `${escapeHtml(parsed.name)}${parsed.detail ? `<br><span class="ai-suggestion-sub">${escapeHtml(parsed.detail)}</span>` : ""}`;
+        panel.dataset.name = parsed.name;
+        panel.dataset.detail = parsed.detail;
+        panel.hidden = false;
+      } catch (err) {
+        showToast(err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = prevLabel;
+      }
+    });
+
+    qs("[data-ai-action='accept']", panel).addEventListener("click", () => {
+      nameEl.value = panel.dataset.name || nameEl.value;
+      nameEl.dispatchEvent(new Event("input", { bubbles: true }));
+      if (panel.dataset.detail !== undefined) {
+        detailEl.value = panel.dataset.detail;
+        detailEl.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      panel.hidden = true;
+    });
+    qs("[data-ai-action='dismiss']", panel).addEventListener("click", () => { panel.hidden = true; });
+  }
+
+  // One-time wiring for the static single-instance textareas that never
+  // get re-rendered (unlike scope items / service rows, which re-attach
+  // their own AI buttons each render pass).
+  function initAiRecommendations() {
+    attachRecommendButton(qs("#fProjectDesc"), "description");
+    attachRecommendButton(qs("#fRevision"), "terms");
+    attachRecommendButton(qs("#fExclusions"), "terms");
+    attachRecommendButton(qs("#fPaymentTerms"), "terms");
+    attachRecommendButton(qs("#fNotes"), "terms");
+  }
+
   /* ---------------------------------------------------------- scope list editor */
 
   function renderScopeList() {
@@ -478,6 +643,7 @@
         <span class="drag-handle">⋮⋮</span>
         <textarea rows="1" data-role="scope-text" placeholder="e.g. 3 Digital USP Videos, 10–15 seconds each">${escapeHtml(text)}</textarea>
         <div class="list-row-actions">
+          <button type="button" class="mini-btn ai-recommend-btn" title="Rekomendasi teks (AI)">✨</button>
           <button type="button" class="mini-btn" data-action="up" title="Move up">▲</button>
           <button type="button" class="mini-btn" data-action="down" title="Move down">▼</button>
         </div>
@@ -497,6 +663,8 @@
         renderDocument();
         scheduleAutosave();
       });
+      const rowEl = ta.closest(".list-row");
+      attachRecommendButton(ta, "scope", rowEl.querySelector(".ai-recommend-btn"), rowEl);
     });
 
     qsa("[data-action]", container).forEach((btn) => {
@@ -571,6 +739,8 @@
       qsa(".service-row", itemsContainer).forEach((rowEl) => {
         const iIdx = Number(rowEl.dataset.idx);
         const row = phase.items[iIdx];
+
+        attachServiceItemRecommendButton(rowEl);
 
         qsa("[data-field]", rowEl).forEach((el) => {
           el.addEventListener("input", () => {
@@ -1131,6 +1301,7 @@
 
     bindControlEvents();
     syncControlsFromState();
+    initAiRecommendations();
     setZoom(zoom);
     fitZoomToViewport();
     updateSaveStatus();

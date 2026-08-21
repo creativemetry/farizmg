@@ -112,6 +112,20 @@
     return { id: uid(), name: "", detail: "", qty: 1, unit: "", rate: 0, showQtyUnit: true, manualAmount: 0 };
   }
 
+  function newPhase() {
+    return { id: uid(), name: "", items: [newServiceRow()] };
+  }
+
+  // Pre-hierarchy drafts/saved docs stored a flat `services` array. Wrap it
+  // into a single unnamed phase so old localStorage data keeps working.
+  function migrateState(raw) {
+    if (raw && !raw.phases) {
+      raw.phases = [{ id: uid(), name: "", items: Array.isArray(raw.services) && raw.services.length ? raw.services : [newServiceRow()] }];
+    }
+    if (raw) delete raw.services;
+    return raw;
+  }
+
   function defaultState(type) {
     type = type === "invoice" ? "invoice" : "quotation";
     const today = todayISO();
@@ -143,7 +157,7 @@
         additionalCost: false,
       },
       scopeItems: ["", ""],
-      services: [newServiceRow()],
+      phases: [newPhase()],
       terms: {
         revision: DEFAULT_TERMS.revision,
         exclusions: DEFAULT_TERMS.exclusions,
@@ -166,7 +180,7 @@
       const raw = localStorage.getItem(STORAGE_DRAFT);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed && parsed.meta && parsed.services) return parsed;
+        if (parsed && parsed.meta && (parsed.services || parsed.phases)) return migrateState(parsed);
       }
     } catch (e) { /* ignore, fall through */ }
     return defaultState("quotation");
@@ -175,7 +189,8 @@
   function loadSavedDocs() {
     try {
       const raw = localStorage.getItem(STORAGE_SAVED);
-      return raw ? JSON.parse(raw) : [];
+      const list = raw ? JSON.parse(raw) : [];
+      return list.map(migrateState);
     } catch (e) { return []; }
   }
   function persistSavedDocs(list) {
@@ -209,8 +224,12 @@
     return (Number(row.qty) || 0) * (Number(row.rate) || 0);
   }
 
+  function computePhaseSubtotal(phase) {
+    return phase.items.reduce((sum, r) => sum + rowAmount(r), 0);
+  }
+
   function computeTotals(st) {
-    const subtotal = st.services.reduce((sum, r) => sum + rowAmount(r), 0);
+    const subtotal = st.phases.reduce((sum, phase) => sum + computePhaseSubtotal(phase), 0);
     let discountAmt = 0;
     if (st.sections.discount) {
       discountAmt = st.calc.discountType === "percent"
@@ -315,7 +334,7 @@
     qs("#wrapCustomCurrency").hidden = state.currency !== "custom";
 
     renderScopeList();
-    renderServicesList();
+    renderPhasesList();
     renderDocument();
     updateSavedCount();
     updateSaveStatus();
@@ -379,15 +398,22 @@
     qs("#fPreset").addEventListener("change", (e) => {
       const key = e.target.value;
       if (!key || !PRESETS[key]) return;
-      state.services = state.services.filter((r) => !(r.name === "" && r.detail === "" && rowAmount(r) === 0));
-      PRESETS[key].forEach((name) => {
+      const items = PRESETS[key].map((name) => {
         const row = newServiceRow();
         row.name = name;
         row.unit = "lump sum";
-        state.services.push(row);
+        return row;
       });
+      const isBlankSinglePhase = state.phases.length === 1
+        && !state.phases[0].name.trim()
+        && state.phases[0].items.every((r) => r.name === "" && r.detail === "" && rowAmount(r) === 0);
+      if (isBlankSinglePhase) {
+        state.phases[0].items = items;
+      } else {
+        state.phases.push({ id: uid(), name: "", items });
+      }
       e.target.value = "";
-      renderServicesList();
+      renderPhasesList();
       renderDocument();
       scheduleAutosave();
       showToast("Preset added — edit rates as needed");
@@ -407,13 +433,13 @@
       if (rows.length) rows[rows.length - 1].focus();
     });
 
-    qs("#btnAddService").addEventListener("click", () => {
-      state.services.push(newServiceRow());
-      renderServicesList();
+    qs("#btnAddPhase").addEventListener("click", () => {
+      state.phases.push(newPhase());
+      renderPhasesList();
       renderDocument();
       scheduleAutosave();
-      const rows = qsa("#servicesList .service-row [data-field='name']");
-      if (rows.length) rows[rows.length - 1].focus();
+      const inputs = qsa("#phasesList .phase-block-head [data-field='name']");
+      if (inputs.length) inputs[inputs.length - 1].focus();
     });
 
     qs("#btnNew").addEventListener("click", onNewDocument);
@@ -498,57 +524,122 @@
     ta.style.height = ta.scrollHeight + "px";
   }
 
-  /* ---------------------------------------------------------- services editor */
+  /* ---------------------------------------------------------- phases & services editor */
 
-  function renderServicesList() {
-    const container = qs("#servicesList");
-    container.innerHTML = state.services.map((row, idx) => serviceRowTemplate(row, idx)).join("")
-      || `<div class="saved-empty">No services yet.</div>`;
+  function renderPhasesList() {
+    const container = qs("#phasesList");
+    container.innerHTML = state.phases.map((phase, pIdx) => phaseBlockTemplate(phase, pIdx)).join("")
+      || `<div class="saved-empty">No phases yet.</div>`;
 
-    qsa(".service-row", container).forEach((rowEl) => {
-      const idx = Number(rowEl.dataset.idx);
-      const row = state.services[idx];
+    qsa(".phase-block", container).forEach((phaseEl) => {
+      const pIdx = Number(phaseEl.dataset.idx);
+      const phase = state.phases[pIdx];
 
-      qsa("[data-field]", rowEl).forEach((el) => {
-        el.addEventListener("input", () => {
-          const field = el.dataset.field;
-          let val = el.value;
-          if (["qty", "rate", "manualAmount"].includes(field)) val = val === "" ? 0 : Number(val);
-          row[field] = val;
-          updateRowAmountDisplay(rowEl, row);
-          renderDocument();
-          scheduleAutosave();
-        });
-      });
-
-      const toggle = qs("[data-field='showQtyUnit']", rowEl);
-      toggle.addEventListener("change", () => {
-        row.showQtyUnit = toggle.checked;
-        renderServicesList();
+      qs("[data-field='name']", phaseEl).addEventListener("input", (e) => {
+        phase.name = e.target.value;
         renderDocument();
         scheduleAutosave();
       });
 
-      qsa("[data-action]", rowEl).forEach((btn) => {
+      qsa(".phase-block-head [data-action]", phaseEl).forEach((btn) => {
         btn.addEventListener("click", () => {
           const action = btn.dataset.action;
-          if (action === "up" && idx > 0) {
-            [state.services[idx - 1], state.services[idx]] = [state.services[idx], state.services[idx - 1]];
-          } else if (action === "down" && idx < state.services.length - 1) {
-            [state.services[idx + 1], state.services[idx]] = [state.services[idx], state.services[idx + 1]];
-          } else if (action === "dup") {
-            const clone = deepClone(row);
-            clone.id = uid();
-            state.services.splice(idx + 1, 0, clone);
+          if (action === "up" && pIdx > 0) {
+            [state.phases[pIdx - 1], state.phases[pIdx]] = [state.phases[pIdx], state.phases[pIdx - 1]];
+          } else if (action === "down" && pIdx < state.phases.length - 1) {
+            [state.phases[pIdx + 1], state.phases[pIdx]] = [state.phases[pIdx], state.phases[pIdx + 1]];
           } else if (action === "del") {
-            state.services.splice(idx, 1);
+            if (phase.items.length && !confirm(`Delete phase "${phase.name.trim() || "Untitled"}" and its ${phase.items.length} item(s)?`)) return;
+            state.phases.splice(pIdx, 1);
           }
-          renderServicesList();
+          renderPhasesList();
           renderDocument();
           scheduleAutosave();
         });
       });
+
+      qs("[data-action='add-item']", phaseEl).addEventListener("click", () => {
+        phase.items.push(newServiceRow());
+        renderPhasesList();
+        renderDocument();
+        scheduleAutosave();
+        const inputs = qsa(".phase-items [data-field='name']", phaseEl);
+        if (inputs.length) inputs[inputs.length - 1].focus();
+      });
+
+      const itemsContainer = qs(".phase-items", phaseEl);
+      qsa(".service-row", itemsContainer).forEach((rowEl) => {
+        const iIdx = Number(rowEl.dataset.idx);
+        const row = phase.items[iIdx];
+
+        qsa("[data-field]", rowEl).forEach((el) => {
+          el.addEventListener("input", () => {
+            const field = el.dataset.field;
+            let val = el.value;
+            if (["qty", "rate", "manualAmount"].includes(field)) val = val === "" ? 0 : Number(val);
+            row[field] = val;
+            updateRowAmountDisplay(rowEl, row);
+            updatePhaseSubtotalDisplay(phaseEl, phase);
+            renderDocument();
+            scheduleAutosave();
+          });
+        });
+
+        const toggle = qs("[data-field='showQtyUnit']", rowEl);
+        toggle.addEventListener("change", () => {
+          row.showQtyUnit = toggle.checked;
+          renderPhasesList();
+          renderDocument();
+          scheduleAutosave();
+        });
+
+        qsa("[data-action]", rowEl).forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const action = btn.dataset.action;
+            if (action === "up" && iIdx > 0) {
+              [phase.items[iIdx - 1], phase.items[iIdx]] = [phase.items[iIdx], phase.items[iIdx - 1]];
+            } else if (action === "down" && iIdx < phase.items.length - 1) {
+              [phase.items[iIdx + 1], phase.items[iIdx]] = [phase.items[iIdx], phase.items[iIdx + 1]];
+            } else if (action === "dup") {
+              const clone = deepClone(row);
+              clone.id = uid();
+              phase.items.splice(iIdx + 1, 0, clone);
+            } else if (action === "del") {
+              phase.items.splice(iIdx, 1);
+            }
+            renderPhasesList();
+            renderDocument();
+            scheduleAutosave();
+          });
+        });
+      });
     });
+  }
+
+  function phaseBlockTemplate(phase, pIdx) {
+    const itemsHtml = phase.items.map((row, iIdx) => serviceRowTemplate(row, iIdx)).join("")
+      || `<div class="saved-empty saved-empty--tight">No items in this phase yet.</div>`;
+    return `
+      <div class="phase-block" data-idx="${pIdx}" data-id="${phase.id}">
+        <div class="phase-block-head">
+          <input type="text" data-field="name" value="${escapeHtml(phase.name)}" placeholder="Phase name (optional) — e.g. Pre-Production" />
+          <div class="phase-block-actions">
+            <button type="button" class="mini-btn" data-action="up" title="Move phase up">▲</button>
+            <button type="button" class="mini-btn" data-action="down" title="Move phase down">▼</button>
+            <button type="button" class="mini-btn mini-danger" data-action="del" title="Delete phase">✕</button>
+          </div>
+        </div>
+        <div class="phase-items">${itemsHtml}</div>
+        <div class="phase-block-foot">
+          <button type="button" class="btn btn-add" data-action="add-item">+ Add item</button>
+          <span class="phase-subtotal" data-phase-subtotal>Subtotal: ${escapeHtml(formatMoney(computePhaseSubtotal(phase), state))}</span>
+        </div>
+      </div>`;
+  }
+
+  function updatePhaseSubtotalDisplay(phaseEl, phase) {
+    const el = qs("[data-phase-subtotal]", phaseEl);
+    if (el) el.textContent = `Subtotal: ${formatMoney(computePhaseSubtotal(phase), state)}`;
   }
 
   function serviceRowTemplate(row, idx) {
@@ -677,18 +768,41 @@
     return header + metaRow + scopeSection + servicesSection + totalsSection + termsSections + paymentSection + footer;
   }
 
+  function serviceDocRowHtml(row, anyBreakdown, st) {
+    const amount = rowAmount(row);
+    const nameCell = `<div class="svc-name">${escapeHtml(row.name || "—")}</div>${row.detail ? `<div class="svc-detail">${escapeHtml(row.detail)}</div>` : ""}`;
+    let breakdownCells = "";
+    if (anyBreakdown) {
+      breakdownCells = row.showQtyUnit
+        ? `<td class="col-num">${escapeHtml(String(row.qty ?? ""))}</td><td class="col-num">${escapeHtml(row.unit || "")}</td><td class="col-num">${formatMoney(row.rate, st)}</td>`
+        : `<td class="col-num">—</td><td class="col-num">—</td><td class="col-num">—</td>`;
+    }
+    return `<tr><td>${nameCell}</td>${breakdownCells}<td class="col-amount col-num">${formatMoney(amount, st)}</td></tr>`;
+  }
+
   function buildServicesHTML(st) {
-    const anyBreakdown = st.services.some((r) => r.showQtyUnit);
-    const rows = st.services.map((row) => {
-      const amount = rowAmount(row);
-      const nameCell = `<div class="svc-name">${escapeHtml(row.name || "—")}</div>${row.detail ? `<div class="svc-detail">${escapeHtml(row.detail)}</div>` : ""}`;
-      let breakdownCells = "";
-      if (anyBreakdown) {
-        breakdownCells = row.showQtyUnit
-          ? `<td class="col-num">${escapeHtml(String(row.qty ?? ""))}</td><td class="col-num">${escapeHtml(row.unit || "")}</td><td class="col-num">${formatMoney(row.rate, st)}</td>`
-          : `<td class="col-num">—</td><td class="col-num">—</td><td class="col-num">—</td>`;
+    const phasesWithItems = st.phases.filter((p) => p.items.length);
+    const allItems = phasesWithItems.flatMap((p) => p.items);
+    const anyBreakdown = allItems.some((r) => r.showQtyUnit);
+    const colCount = anyBreakdown ? 5 : 2;
+    // A single unnamed phase is the common "simple project" case — render it
+    // as a flat list with no group header/subtotal, matching the old layout.
+    // Multiple phases, or any phase someone bothered to name, get grouped.
+    const showGrouping = phasesWithItems.length > 1 || phasesWithItems.some((p) => p.name.trim());
+
+    const rows = phasesWithItems.map((phase, i) => {
+      const label = phase.name.trim() || "Services";
+      let html = "";
+      if (showGrouping) {
+        html += `<tr class="phase-row${i === 0 ? " phase-row--first" : ""}"><td colspan="${colCount}">${escapeHtml(label)}</td></tr>`;
       }
-      return `<tr><td>${nameCell}</td>${breakdownCells}<td class="col-amount col-num">${formatMoney(amount, st)}</td></tr>`;
+      html += phase.items.map((row) => serviceDocRowHtml(row, anyBreakdown, st)).join("");
+      if (showGrouping) {
+        const leadColspan = colCount - 2;
+        const leadTd = leadColspan > 0 ? `<td colspan="${leadColspan}"></td>` : "";
+        html += `<tr class="phase-subtotal-row">${leadTd}<td class="phase-subtotal-label">Subtotal ${escapeHtml(label)}</td><td class="col-amount">${formatMoney(computePhaseSubtotal(phase), st)}</td></tr>`;
+      }
+      return html;
     }).join("");
 
     return `
@@ -702,7 +816,7 @@
               <th class="col-num">Amount</th>
             </tr>
           </thead>
-          <tbody>${rows || `<tr><td colspan="5">No services added yet.</td></tr>`}</tbody>
+          <tbody>${rows || `<tr><td colspan="${colCount}">No services added yet.</td></tr>`}</tbody>
         </table>
       </div>`;
   }
